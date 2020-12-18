@@ -1,0 +1,35 @@
+TransformerModel(
+  (pos_encoder): PositionalEncoding(
+    (dropout): Dropout(p=0.2, inplace=False)
+  )
+  (transformer_encoder): TransformerEncoder(
+    (layers): ModuleList(
+      (0): TransformerEncoderLayer(
+        (self_attn): MultiheadAttention(
+          (out_proj): _LinearWithBias(in_features=200, out_features=200, bias=True)
+        )
+        (linear1): Linear(in_features=200, out_features=200, bias=True)
+        (dropout): Dropout(p=0.2, inplace=False)
+        (linear2): Linear(in_features=200, out_features=200, bias=True)
+        (norm1): LayerNorm((200,), eps=1e-05, elementwise_affine=True)
+        (norm2): LayerNorm((200,), eps=1e-05, elementwise_affine=True)
+        (dropout1): Dropout(p=0.2, inplace=False)
+        (dropout2): Dropout(p=0.2, inplace=False)
+      )
+      (1): TransformerEncoderLayer(
+        (self_attn): MultiheadAttention(
+          (out_proj): _LinearWithBias(in_features=200, out_features=200, bias=True)
+        )
+        (linear1): Linear(in_features=200, out_features=200, bias=True)
+        (dropout): Dropout(p=0.2, inplace=False)
+        (linear2): Linear(in_features=200, out_features=200, bias=True)
+        (norm1): LayerNorm((200,), eps=1e-05, elementwise_affine=True)
+        (norm2): LayerNorm((200,), eps=1e-05, elementwise_affine=True)
+        (dropout1): Dropout(p=0.2, inplace=False)
+        (dropout2): Dropout(p=0.2, inplace=False)
+      )
+    )
+  )
+  (encoder): Embedding(28783, 200)
+  (decoder): Linear(in_features=200, out_features=28783, bias=True)
+)

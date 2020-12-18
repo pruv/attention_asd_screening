@@ -1,0 +1,8 @@
+http://jalammar.github.io/illustrated-transformer/
+https://pytorch.org/tutorials/beginner/transformer_tutorial.html
+https://github.com/jadore801120/attention-is-all-you-need-pytorch
+https://towardsdatascience.com/how-to-code-the-transformer-in-pytorch-24db27c8f9ec
+https://towardsdatascience.com/the-transformer-a-quick-run-through-ce9b21b4f3ed
+http://jalammar.github.io/illustrated-transformer/
+https://colab.research.google.com/github/tensorflow/tensor2tensor/blob/master/tensor2tensor/notebooks/hello_t2t.ipynb
+http://nlp.seas.harvard.edu/2018/04/03/attention.html#prelims

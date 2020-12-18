@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.autograd import Variable
 from torchvision import models
-import os
+import numpy as np
+from transformer_model_2.transformer2 import TransformerModel
 
 class G_LSTM(nn.Module):
 	"""
@@ -56,9 +56,13 @@ class Sal_seq(nn.Module):
 		else:
 			assert 0, 'Backend not implemented'
 
-		self.rnn = G_LSTM(input_size,hidden_size)
+		device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+		# self.rnn = G_LSTM(input_size,hidden_size)
 		self.decoder = nn.Linear(hidden_size,1,bias=True) # comment for multi-modal distillation
 		self.hidden_size = hidden_size
+
+		self.encoder = TransformerModel(ntoken=14, ninp=2048, nhead=2, nhid=200, nlayers=2, device=device, dropout=0.2)
 
 	def init_resnet(self,resnet):
 		self.backend = nn.Sequential(*list(resnet.children())[:-2])
@@ -68,8 +72,10 @@ class Sal_seq(nn.Module):
 		self.backend = nn.Sequential(*list(vgg.features.children())[:-2]) # omitting the last Max Pooling
 
 	def init_hidden(self,batch): #initializing hidden state as all zero
-		h = torch.zeros(batch,self.hidden_size).cuda()
-		c = torch.zeros(batch,self.hidden_size).cuda()
+		h = torch.zeros(batch,self.hidden_size)
+		c = torch.zeros(batch,self.hidden_size)
+		# h = torch.zeros(batch,self.hidden_size).cuda()
+		# c = torch.zeros(batch,self.hidden_size).cuda()
 		return (Variable(h),Variable(c))
 
 	def process_lengths(self,input):
@@ -94,27 +100,68 @@ class Sal_seq(nn.Module):
 		x = x.sum(1).view(batch_size, x.size(2))
 		return x
 
-	def forward(self,x,fixation):
+	# def forward(self,x,fixation):
+	# 	#x: torch.Size([12, 3, 600, 800])
+	# 	# fixation: torch.Size([12, 14])
+	# 	# fixation = fixation.int()
+	# 	valid_len = self.process_lengths(fixation) # computing valid fixation lengths
+	# 	x = self.backend(x)
+	# 	batch, feat, h, w = x.size() # 12, 2048, 19, 25
+	# 	x = x.view(batch,feat,-1) # 12 x 2048 x 475
+	#
+	# 	# recurrent loop
+	# 	state = self.init_hidden(batch) # initialize hidden state
+	# 	fixation = fixation.view(fixation.size(0),1,fixation.size(1))
+	# 	fixation = fixation.expand(fixation.size(0),feat,fixation.size(2)) # fixation torch.Size([12, 2048, 14])
+	# 	x = x.gather(2,fixation) # 12 x 2048 x 14
+	# 	output = [] # list of 14 each torch.Size([12, 1, 512])
+	# 	trans_ip = torch.zeros((x.size(0), self.seq_len, x.size(1)))
+	# 	for i in range(self.seq_len):
+	# 		# extract features corresponding to current fixation
+	# 		cur_x = x[:,:,i].contiguous() # torch.Size([12, 2048])
+	# 		for j in range(cur_x.size(0)):
+	# 			trans_ip[j,i] = cur_x[j]
+	# 		#LSTM forward
+	# 		state = self.rnn(cur_x,state)
+	# 		output.append(state[0].view(batch,1,self.hidden_size))
+	#
+	# 	# for transformer pass all 14 fixations at one go
+	# 	# collect 12
+	#
+	# 	# selecting hidden states from the valid fixations without padding
+	# 	output = torch.cat(output, 1)
+	# 	output = self.crop_seq(output,valid_len)
+	# 	output = torch.sigmoid(self.decoder(output)) # torch.Size([12, 1])
+	# 	return output
+
+	def forward(self,x,fixation, src_mask):
+		#x: torch.Size([12, 3, 600, 800])
+		# fixation: torch.Size([12, 14])
+		# fixation = fixation.int()
 		valid_len = self.process_lengths(fixation) # computing valid fixation lengths
 		x = self.backend(x)
-		batch, feat, h, w = x.size()
-		x = x.view(batch,feat,-1)
+		batch, feat, h, w = x.size() # 12, 2048, 19, 25
+		x = x.view(batch,feat,-1) # 12 x 2048 x 475
 
 		# recurrent loop
 		state = self.init_hidden(batch) # initialize hidden state
 		fixation = fixation.view(fixation.size(0),1,fixation.size(1))
-		fixation = fixation.expand(fixation.size(0),feat,fixation.size(2))
-		x = x.gather(2,fixation)
-		output = []
+		fixation = fixation.expand(fixation.size(0),feat,fixation.size(2)) # fixation torch.Size([12, 2048, 14])
+		x = x.gather(2,fixation) # 12 x 2048 x 14
+		output = [] # list of 14 each torch.Size([12, 1, 512])
+		trans_ip = torch.zeros((x.size(0), self.seq_len, x.size(1)))
 		for i in range(self.seq_len):
 			# extract features corresponding to current fixation
-			cur_x = x[:,:,i].contiguous()
-			#LSTM forward
-			state = self.rnn(cur_x,state)
-			output.append(state[0].view(batch,1,self.hidden_size))
+			cur_x = x[:,:,i].contiguous() # torch.Size([12, 2048])
+			for j in range(cur_x.size(0)):
+				trans_ip[j,i] = cur_x[j]
+
+		# for transformer pass all 14 fixations at one go
+		# collect 12
+		op = self.encoder(trans_ip, src_mask)
 
 		# selecting hidden states from the valid fixations without padding
 		output = torch.cat(output, 1)
 		output = self.crop_seq(output,valid_len)
-		output = torch.sigmoid(self.decoder(output))
+		output = torch.sigmoid(self.decoder(output)) # torch.Size([12, 1])
 		return output
