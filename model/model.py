@@ -61,7 +61,6 @@ class Sal_seq(nn.Module):
 		# self.rnn = G_LSTM(input_size,hidden_size)
 		self.decoder = nn.Linear(hidden_size,1,bias=True) # comment for multi-modal distillation
 		self.hidden_size = hidden_size
-
 		self.encoder = TransformerModel(ntoken=14, ninp=2048, nhead=2, nhid=200, nlayers=2, device=device, dropout=0.2)
 
 	def init_resnet(self,resnet):
@@ -86,7 +85,7 @@ class Sal_seq(nn.Module):
 		lengths = list(max_length - input.data.eq(0).sum(1).squeeze())
 		return lengths
 
-	def crop_seq(self,x,lengths):
+	def crop_seq(self,x,lengths): # x torch.Size([12, 14, 512])
 		"""
 		Adaptively select the hidden state at the end of sentences
 		"""
@@ -115,21 +114,15 @@ class Sal_seq(nn.Module):
 	# 	fixation = fixation.expand(fixation.size(0),feat,fixation.size(2)) # fixation torch.Size([12, 2048, 14])
 	# 	x = x.gather(2,fixation) # 12 x 2048 x 14
 	# 	output = [] # list of 14 each torch.Size([12, 1, 512])
-	# 	trans_ip = torch.zeros((x.size(0), self.seq_len, x.size(1)))
 	# 	for i in range(self.seq_len):
 	# 		# extract features corresponding to current fixation
 	# 		cur_x = x[:,:,i].contiguous() # torch.Size([12, 2048])
-	# 		for j in range(cur_x.size(0)):
-	# 			trans_ip[j,i] = cur_x[j]
 	# 		#LSTM forward
 	# 		state = self.rnn(cur_x,state)
 	# 		output.append(state[0].view(batch,1,self.hidden_size))
 	#
-	# 	# for transformer pass all 14 fixations at one go
-	# 	# collect 12
-	#
 	# 	# selecting hidden states from the valid fixations without padding
-	# 	output = torch.cat(output, 1)
+	# 	output = torch.cat(output, 1) # torch.Size([12, 14, 512])
 	# 	output = self.crop_seq(output,valid_len)
 	# 	output = torch.sigmoid(self.decoder(output)) # torch.Size([12, 1])
 	# 	return output
@@ -143,12 +136,9 @@ class Sal_seq(nn.Module):
 		batch, feat, h, w = x.size() # 12, 2048, 19, 25
 		x = x.view(batch,feat,-1) # 12 x 2048 x 475
 
-		# recurrent loop
-		state = self.init_hidden(batch) # initialize hidden state
 		fixation = fixation.view(fixation.size(0),1,fixation.size(1))
 		fixation = fixation.expand(fixation.size(0),feat,fixation.size(2)) # fixation torch.Size([12, 2048, 14])
 		x = x.gather(2,fixation) # 12 x 2048 x 14
-		output = [] # list of 14 each torch.Size([12, 1, 512])
 		trans_ip = torch.zeros((x.size(0), self.seq_len, x.size(1)))
 		for i in range(self.seq_len):
 			# extract features corresponding to current fixation
@@ -160,8 +150,17 @@ class Sal_seq(nn.Module):
 		# collect 12
 		op = self.encoder(trans_ip, src_mask)
 
+		# temp = torch.zeros(op.size(0), op.size(1)*op.size(2))
+		# for k in range(op.size(0)):
+		# 	list = []
+		# 	for l in range(op.size(1)):
+		# 		list.append(op[k][l])
+		# 	t_cat = torch.cat(list, 0)
+		# 	temp[k] = t_cat
+
+		# temp torch.Size([12, 28672])
 		# selecting hidden states from the valid fixations without padding
-		output = torch.cat(output, 1)
-		output = self.crop_seq(output,valid_len)
+		# output = torch.cat(output, 1)
+		output = self.crop_seq(op,valid_len)
 		output = torch.sigmoid(self.decoder(output)) # torch.Size([12, 1])
 		return output

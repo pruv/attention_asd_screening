@@ -79,7 +79,8 @@ def main():
         # trainloader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=2)
         # valloader = torch.utils.data.DataLoader(val_set, batch_size=args.batch_size, shuffle=False, num_workers=2)
 
-        model = Sal_seq(backend=args.backend,seq_len=args.max_len,hidden_size=args.hidden_size)
+        # model = Sal_seq(backend=args.backend,seq_len=args.max_len,hidden_size=args.hidden_size)
+        model = Sal_seq(backend=args.backend,seq_len=args.max_len,hidden_size=2048)
         # model = model.cuda()
 
         # print(summary(model, input_size=[(3, 600, 800), (14,)]))
@@ -100,10 +101,12 @@ def main():
                 optimizer.zero_grad()
 
                 pred = model(img,fix, src_mask)
+                # pred = model(img,fix)
+
                 loss = F.binary_cross_entropy(pred,target)
                 loss.backward()
-                if args.clip != -1:
-                    clip_gradient(optimizer,args.clip)
+                # if args.clip != -1:
+                #     clip_gradient(optimizer,args.clip)
                 optimizer.step()
                 avg_loss = (avg_loss*np.maximum(0,j) + loss.data.cpu().numpy())/(j+1)
                 print('Epoch: ', iteration, ' batch: ', j)
