@@ -13,7 +13,7 @@ class TransformerModel(nn.Module):
         self.pos_encoder = PositionalEncoding(ninp, dropout)
         encoder_layers = TransformerEncoderLayer(ninp, nhead, nhid, dropout)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
-        # self.encoder = nn.Embedding(ntoken, ninp)
+        self.encoder = nn.Embedding(ntoken, ninp)
         self.ninp = ninp
         self.decoder = nn.Linear(ninp, ntoken)
         self.device = device
@@ -27,26 +27,19 @@ class TransformerModel(nn.Module):
 
     def init_weights(self):
         initrange = 0.1
-        # self.encoder.weight.data.uniform_(-initrange, initrange)
+        self.encoder.weight.data.uniform_(-initrange, initrange)
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, src, src_mask): # src torch.Size([35, 20])
-        # src = self.encoder(src) * math.sqrt(self.ninp) # src torch.Size([35, 20, 200])
+        src = self.encoder(src) * math.sqrt(self.ninp) # src torch.Size([35, 20, 200])
 
         src = self.pos_encoder(src) # src torch.Size([35, 20, 200])
 
         output = self.transformer_encoder(src, src_mask) # output torch.Size([35, 20, 200])
-        # output = self.decoder(output) # output torch.Size([35, 20, 28783])
+        output = self.decoder(output) # output torch.Size([35, 20, 28783])
         return output
 
-    # def forward(self, src):
-    #     src_mask = self.generate_square_subsequent_mask(src.size(0)).to(self.device)
-    #     src = self.encoder(src) * math.sqrt(self.ninp)
-    #     src = self.pos_encoder(src)
-    #     output = self.transformer_encoder(src, src_mask)
-    #     output = self.decoder(output)
-    #     return output
 
 class PositionalEncoding(nn.Module):
 

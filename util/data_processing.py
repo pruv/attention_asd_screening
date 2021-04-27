@@ -1,19 +1,19 @@
-from PIL import Image
-import os
-import numpy as np
-import torch.utils.data as data
-import cv2
-import gc
-import torch
-import pandas as pd
 import operator
-from glob import glob
+import os
 
-def read_dataset(anno_path):
+import cv2
+import numpy as np
+import pandas as pd
+import torch
+import torch.utils.data as data
+from PIL import Image
+
+
+def read_dataset(anno_path, input_size=301):
     anno_dict = dict()
     max_len = dict()
     # Saliency4ASD has 300 images
-    for i in range(1,301):
+    for i in range(1, input_size):
         img = cv2.imread(os.path.join(anno_path,'Images',str(i)+'.png'))
         y_lim, x_lim, _ = img.shape
         anno_dict[i] = dict()

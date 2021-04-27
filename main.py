@@ -46,7 +46,8 @@ transform = transforms.Compose([transforms.Resize((args.img_height,args.img_widt
 def clip_gradient(optimizer, grad_clip):
     for group in optimizer.param_groups:
         for param in group['params']:
-            param.grad.data.clamp_(-grad_clip, grad_clip)
+            if param.grad is not None and param.grad.data is not None:
+                param.grad.data.clamp_(-grad_clip, grad_clip)
 
 def adjust_lr(optimizer, epoch):
     "adatively adjust lr based on epoch"
@@ -66,12 +67,13 @@ def generate_square_subsequent_mask(sz):
 
 def main():
     tf_summary_writer = tf.summary.create_file_writer(args.checkpoint_path)
-    anno = read_dataset(args.anno_dir, 21)
+    input_size = 1
+    anno = read_dataset(args.anno_dir, input_size=input_size+1)
     overall_acc = []
     for fold in range(args.n_fold):
         train_data, val_data = loo_split(anno,fold)
         # valid_id = image_selection(train_data, args.select_number)
-        valid_id = image_selection(train_data, 20)
+        valid_id = image_selection(train_data, select_number=input_size)
         train_set = Dataset(args.img_dir,train_data,valid_id,args.max_len,args.img_height,args.img_width,transform)
         val_set = Dataset(args.img_dir,val_data,valid_id,args.max_len,args.img_height,args.img_width,transform)
         trainloader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=0)
@@ -105,11 +107,11 @@ def main():
 
                 loss = F.binary_cross_entropy(pred,target)
                 loss.backward()
-                # if args.clip != -1:
-                #     clip_gradient(optimizer,args.clip)
+                if args.clip != -1:
+                    clip_gradient(optimizer,args.clip)
                 optimizer.step()
                 avg_loss = (avg_loss*np.maximum(0,j) + loss.data.cpu().numpy())/(j+1)
-                print('Epoch: ', iteration, ' batch: ', j)
+                print('Epoch: ', iteration, ' batch: ', j, ' avg_loss: ', avg_loss.numpy()[0])
                 if j%25 == 0:
                     with tf_summary_writer.as_default():
                         tf.summary.scalar('training loss_fold_'+str(fold+1),avg_loss,step=iteration)
@@ -121,13 +123,17 @@ def main():
         def validation_loo(epoch):
             model.eval()
             avg_pred = []
-
+            src_mask = generate_square_subsequent_mask(args.batch_size)
             for _, (img,target,fix) in enumerate(valloader):
+                # if len(img) < args.batch_size:
+                #     continue
                 img, target, fix = Variable(img), Variable(target.type(torch.FloatTensor)), Variable(fix,requires_grad=False)
                 # img, target, fix = img.cuda(), target.cuda(), fix.cuda()
                 img, target, fix = img, target, fix
-
-                pred = model(img,fix)
+                if img.size(0) != args.batch_size:
+                    src_mask = generate_square_subsequent_mask(img.size(0))
+                pred = model(img,fix, src_mask)
+                print("prediction: ", pred)
                 pred = pred.data.cpu().numpy()
                 target = target.data.cpu().numpy()[0,0]
                 avg_pred.extend(pred)
